@@ -6,69 +6,65 @@ namespace E4.ObjectPoolManager
 {
     public class ObjectPoolManager : GenericMonoSingleton<ObjectPoolManager>
     {
-        #region Field
+        Dictionary<int, IObjectPool<MonoBehaviour>> m_Pools = new Dictionary<int, IObjectPool<MonoBehaviour>>();
 
-        Dictionary<GameObject, int> m_Prefabs = new Dictionary<GameObject, int>();
+        [Header("Registered Prefabs")] 
+        [SerializeField] List<MonoBehaviour> m_PrefabList = new List<MonoBehaviour>();
+        [SerializeField] List<int> m_PrefabIDList = new List<int>();
 
-        List<PoolInstance> m_Pools = new List<PoolInstance>();
-
-        #endregion
-
-        #region State
-
-        [Header("State")] 
-        [SerializeField] List<GameObject> m_Instances = new List<GameObject>();
-
-        #endregion
-
-        #region Buffer
-
-        GameObject instanceGroup;
-        GameObject instance;
-        PoolTracker tracker;
-        bool isActive;
-        int prefabID;
-        PoolInstance poolInstance;
-
-        #endregion
-
-        #region API
-
-        public static T GetInstance<T>(GameObject _prefab)
+        /// <summary>
+        /// 매개인자로 전달받은 원본 프리팹으로부터 activeSelf = false 상태인 프리팹 인스턴스를 생성한 뒤,
+        /// 프리팹 인스턴스를 대상으로 하는 Object Pool을 생성하고 Dictionary에 저장한다.
+        /// </summary>
+        public IObjectPool<T> Initialize<T>(T _prefab, bool _collectionCheck = true,
+            int _defaultCapacity = 10, int _maxSize = 1000) where T : MonoBehaviour
         {
-            return Instance.m_Prefabs.TryGetValue(_prefab, out var id)
-                ? Instance.m_Pools[id].GetPool().Get().GetComponent<T>()
-                : Instance.CreatePool(_prefab).Get().GetComponent<T>();
+            var prefabID = _prefab.GetInstanceID();
+
+            return Initialize<T>(prefabID, _prefab, _collectionCheck,
+                _defaultCapacity, _maxSize);
         }
-
-        public static GameObject GetInstance(GameObject _prefab)
+        
+        /// <summary>
+        /// 런타임 최적화를 위해 오브젝트 풀을 사용하는 클래스의 OnValidate 이벤트에서 프리팹의 인스턴스 ID를 미리 가져와 멤버 변수로 저장해두는 경우 사용
+        /// </summary>
+        public IObjectPool<T> Initialize<T>(int _prefabID, T _prefab, bool _collectionCheck = true,
+            int _defaultCapacity = 10, int _maxSize = 1000) where T : MonoBehaviour
         {
-            return Instance.m_Prefabs.TryGetValue(_prefab, out var id)
-                ? Instance.m_Pools[id].GetPool().Get()
-                : Instance.CreatePool(_prefab).Get();
-        }
+            // 인터페이스 상속 여부 확인
+            if (_prefab is not IObjectPoolInstance<T>)
+            {
+                print(_prefab.name + " must inherit IObjectPoolInstance<" + typeof(T).Name + ">");
+                return null;
+            }
 
-        public static void ReleaseInstance(GameObject _instance)
-        {
-            var tracker = _instance.GetComponent<PoolTracker>();
-            if (tracker is null)
-                Destroy(_instance);
+            // 이미 등록된 상태라면 미리 생성된 오브젝트 풀 반환
+            IObjectPool<T> objectPool;
+            if (m_Pools.TryGetValue(_prefabID, out var createdPool))
+            {
+                objectPool = createdPool as IObjectPool<T>;
+            }
             else
-                Instance.m_Pools[tracker.PrefabID].GetPool().Release(_instance);
+            {
+                // 오브젝트 풀 생성 및 등록
+                objectPool = CreatePool(_prefab, _collectionCheck, _defaultCapacity, _maxSize);
+                m_Pools.Add(_prefabID, objectPool as IObjectPool<MonoBehaviour>);
+                m_PrefabList.Add(_prefab);
+                m_PrefabIDList.Add(_prefabID);
+            }
+
+            return objectPool;
         }
-
-        #endregion
-
-        #region Method
-
-        IObjectPool<GameObject> CreatePool(GameObject _newPrefab)
+        
+        /// <summary>
+        /// 매개인자로 전달받은 원본 프리팹으로부터 activeSelf = false 상태인 프리팹 인스턴스를 생성한 뒤,
+        /// 프리팹 인스턴스를 대상으로 하는 Object Pool을 생성하고 Dictionary에 저장한다.
+        /// </summary>
+        IObjectPool<T> CreatePool<T>(T _prefab, bool _collectionCheck,
+            int _defaultCapacity, int _maxSize) where T : MonoBehaviour
         {
-            // Pool Manager에 Prefab 등록 및 ID 할당
-            prefabID = m_Prefabs.Count;
-            m_Prefabs.Add(_newPrefab, prefabID);
-
             // 생성된 오브젝트들을 담아둘 빈 오브젝트
-            instanceGroup = new GameObject(_newPrefab.name + " Pool")
+            var instanceGroup = new GameObject(_prefab.name + " Pool")
             {
                 transform =
                 {
@@ -76,92 +72,63 @@ namespace E4.ObjectPoolManager
                 }
             };
 
-            // 비활성화된 Prefab 인스턴스 생성
-            isActive = _newPrefab.activeSelf;
-            _newPrefab.SetActive(false);
-            instance = Instantiate(_newPrefab, instanceGroup.transform);
-            instance.name = _newPrefab.name;
-            _newPrefab.SetActive(isActive);
+            // 비활성화된 프리팹 인스턴스 생성
+            var isActive = _prefab.gameObject.activeSelf;
+            _prefab.gameObject.SetActive(false);
+            var instance = Instantiate(_prefab, instanceGroup.transform);
+            instance.name = _prefab.name;
+            _prefab.gameObject.SetActive(isActive);
 
-            // Prefab 인스턴스에 PoolTracker 부착 및 인스턴스 리스트에 등록
-            tracker = instance.AddComponent<PoolTracker>();
-            tracker.PrefabID = prefabID;
-            m_Instances.Add(instance);
-
-            // Pool 생성 및 등록
-            poolInstance = new PoolInstance(instance, instanceGroup.transform);
-            m_Pools.Add(poolInstance);
+            // Pool 생성
+            var poolInstance = new PoolInstance<T>(instance, instanceGroup.transform, _collectionCheck,
+                _defaultCapacity, _maxSize);
 
             return poolInstance.GetPool();
         }
-
-        #endregion
     }
 
-    // Pool Manager에서만 추가
-    public class PoolTracker : MonoBehaviour
+    public class PoolInstance<T> where T : MonoBehaviour
     {
-        [SerializeField] int m_PrefabID = -1;
-
-        public int PrefabID
-        {
-            get => m_PrefabID;
-            set
-            {
-                if (m_PrefabID < 0)
-                    m_PrefabID = value;
-            }
-        }
-    }
-
-    public class PoolInstance
-    {
-        readonly GameObject m_Prefab; // 복제 대상
-        readonly IObjectPool<GameObject> m_Pool; // 실제 오브젝트 풀
+        readonly T m_PrefabInstance; // 복제 대상
+        readonly IObjectPool<T> m_Pool; // 실제 오브젝트 풀
         readonly Transform m_InstanceGroup; // 생성된 오브젝트들을 담아두는 빈 오브젝트
 
-        #region Buffer
+        public IObjectPool<T> GetPool() => m_Pool;
 
-        GameObject instance;
-
-        #endregion
-
-        public IObjectPool<GameObject> GetPool() => m_Pool;
-
-        public PoolInstance(GameObject _prefab, Transform _instanceGroup, bool _collectionCheck = true,
-            int _defaultCapacity = 10, int _maxSize = 10000)
+        public PoolInstance(T _prefabInstance, Transform _instanceGroup, bool _collectionCheck,
+            int _defaultCapacity, int _maxSize)
         {
             // 변수 설정
-            m_Prefab = _prefab;
+            m_PrefabInstance = _prefabInstance;
             m_InstanceGroup = _instanceGroup;
 
             // 오브젝트 풀 생성
-            m_Pool = new ObjectPool<GameObject>(OnCreate, OnGet, OnRelease, OnDestroy, _collectionCheck,
+            m_Pool = new ObjectPool<T>(OnCreate, OnGet, OnRelease, OnDestroy, _collectionCheck,
                 _defaultCapacity,
                 _maxSize);
         }
 
-        GameObject OnCreate()
+        T OnCreate()
         {
-            instance = Object.Instantiate(m_Prefab, m_InstanceGroup);
+            var instance = Object.Instantiate(m_PrefabInstance, m_InstanceGroup);
+            (instance as IObjectPoolInstance<T>).ObjectPool = m_Pool; // ObjectPoolManager.Initialize 에서 인터페이스 상속 여부 확인 완료
 
             return instance;
         }
 
-        void OnGet(GameObject _instance)
+        void OnGet(T _instance)
         {
 
         }
 
-        void OnRelease(GameObject _instance)
+        void OnRelease(T _instance)
         {
-            _instance.SetActive(false);
-            // _instance.transform.parent = m_InstanceGroup;
+            _instance.gameObject.SetActive(false);
         }
 
-        void OnDestroy(GameObject _instance)
+        void OnDestroy(T _instance)
         {
-
+            Object.Destroy(_instance.gameObject);
         }
     }
 }
