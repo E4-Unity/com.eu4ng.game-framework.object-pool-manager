@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Pool;
 
-namespace E4.ObjectPoolManager
+namespace E4.GameFramework
 {
     // TODO 인터페이스로 대체할 방법이 없을까?
     // For IObjectPool<T>.Get()

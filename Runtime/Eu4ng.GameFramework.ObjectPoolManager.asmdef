@@ -1,0 +1,16 @@
+{
+    "name": "Eu4ng.GameFramework.ObjectPoolManager",
+    "rootNamespace": "",
+    "references": [
+        "GUID:547110c949cc48248865e1885a560882"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

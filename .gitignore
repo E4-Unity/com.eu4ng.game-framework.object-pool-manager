@@ -1,5 +1,12 @@
-# Rider IDE
-/.idea/
+# Draw.io
+*.bkp
+*.dtmp
+
+# Rider
+/.idea
+
+# VS Code
+/.vscode
 
 # Visual Studio
 /.vsconfig

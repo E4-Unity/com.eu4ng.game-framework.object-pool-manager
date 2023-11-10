@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Pool;
 
-namespace E4.ObjectPoolManager
+namespace E4.GameFramework
 {
     // For IObjectPool<T>.Release(T _instance)
     public interface IObjectPoolInstance<T> where T : MonoBehaviour

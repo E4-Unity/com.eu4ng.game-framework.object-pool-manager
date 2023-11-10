@@ -1,0 +1,10 @@
+{
+  "name": "com.eu4ng.game-framework.object-pool-manager",
+  "displayName": "GF Object Pool Manager",
+  "version": "0.1.0",
+  "author": "Eu4ng",
+  "description": "Object Pool Manager",
+  "dependencies": {
+    "com.eu4ng.utility.generic-singleton": "https://github.com/Eu4ngUnity/unitypackage-generic-singleton.git"
+  }
+}

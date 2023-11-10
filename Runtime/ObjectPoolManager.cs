@@ -1,8 +1,9 @@
 using System.Collections.Generic;
+using E4.Utility;
 using UnityEngine;
 using UnityEngine.Pool;
 
-namespace E4.ObjectPoolManager
+namespace E4.GameFramework
 {
     public class ObjectPoolManager : GenericMonoSingleton<ObjectPoolManager>
     {
